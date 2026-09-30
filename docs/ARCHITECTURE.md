@@ -1,5 +1,9 @@
 # Architecture - current state (setup.sh 2.0.3)
 
+> Since Phase 1 the 39 embedded files live in `src/` (byte for byte). `setup.sh` is the source form and
+> `dist/setup.sh` is the generated single file for the pod (see `docs/DEVELOPMENT.md`). The line
+> numbers below refer to the single-file 2.0.3 layout, which `dist/setup.sh` still reproduces exactly.
+
 This describes the code as it is at commit `3881587` (`setup.sh` 2.0.3, sha256 `75431821…c043051`,
 8 354 lines). It was written in Phase 0 by reading every module. Nothing was changed.
 

@@ -27,7 +27,9 @@ glibc < 2.31 (vLLM install will fail), `/workspace` < 90 GB free.
 
 ## 1. Copy setup.sh and run the offline checks on the pod (1 min)
 
-Upload `setup.sh` to `/workspace/setup.sh` (JupyterLab upload or `runpodctl send/receive`).
+Upload **`dist/setup.sh`** from the repository to `/workspace/setup.sh` (JupyterLab upload or
+`runpodctl send/receive`). Since the Phase 1 restructuring, the `setup.sh` in the repository root is the
+source form; it needs `src/` next to it (see `docs/DEVELOPMENT.md`).
 ```bash
 sha256sum /workspace/setup.sh            # compare with the value in the final report / commit message
 bash -n /workspace/setup.sh && echo SYNTAX_OK

@@ -7,6 +7,26 @@ policy). All estimates are marked **ESTIMATE**.
 
 ---
 
+## Unreleased - repository restructuring (Phase 1 of docs/PLAN.md), setup.sh stays 2.0.3
+
+* The installer for the pod is now **generated**. `dist/setup.sh` is built from the source-form `setup.sh` plus
+  `src/` by `tools/bundle.py`. It is byte-identical to 2.0.3 (sha256 `75431821…c043051`), so nothing changes
+  on the pod.
+* `src/` holds the 39 formerly embedded files byte for byte:
+  * `app/`: 27 modules, 3 locks and `env.sh`
+  * `scripts/`: run, start, agent
+  * `installer/`: 5 install-time scripts
+* New development tooling (never installed on the pod):
+  * `tools/check_identical.py`: the byte-identity check
+  * pytest wrappers around `app.testplans unit`
+  * ruff (explicit rules plus a per-file baseline for the 2.0.3 code)
+  * `tools/shellcheck_all.sh`, a Makefile, and `requirements-dev.lock` / `requirements-bpy.lock`
+  * `docs/DEVELOPMENT.md`
+* No optional Dockerfile. This environment has no Docker daemon to build or test one with, and its base
+  image could not be pinned to a verified digest.
+
+---
+
 ## 2.0.3 - 2026-09-30 - fix: vLLM start-up (FlashInfer just-in-time build)
 
 * Pod report (L40S): the agent LLM check failed, setup fell back to the rules backend. `logs/llm_server.log`:

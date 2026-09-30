@@ -29,19 +29,53 @@ Legend: `[x]` done and verified here (CPU) · `[ ]` open · **UNVERIFIED** = nee
 Not verified in Phase 0: anything on a GPU; the image token cost of Qwen3.5; whether xgrammar
 accepts our schemas (planned CPU check in Phase 3).
 
-## Phase 1 - make the code editable (no behaviour change)
+## Phase 1 - make the code editable (done 2026-09-30, waiting for go-ahead)
 
-- [ ] tag `v2.0.3` → `3881587`
-- [ ] `tools/extract.py`: 39 heredoc bodies → `src/`; `setup.sh` in source form with `# bundle:heredoc` tags
-- [ ] `tools/bundle.py` → `dist/setup.sh`; `--check`
-- [ ] Byte identity:
-  - [ ] each `src/` file == its heredoc body
-  - [ ] `dist/setup.sh` == `v2.0.3:setup.sh`
-  - [ ] `--code-only` trees identical (source form, dist, 2.0.3)
-- [ ] pytest wrappers around `testplans unit` (temporary `PIPE_WS`, bpy auto-detected)
-- [ ] ruff (lint only, baseline) + shellcheck 0.11.0 on all shell files; `requirements-dev.lock`
-- [ ] Makefile (test, lint, bundle, check-identical, shellcheck); optional Dockerfile
-- [ ] PROGRESS update + summary → stop
+- [x] Reference: commit `3881587`:setup.sh, sha256 `75431821…c043051`. The check verifies this hash; no git
+      tag is needed.
+- [x] `tools/extract.py`:
+  - [x] the 39 heredoc bodies went to `src/app` (27 .py, 3 .lock, env.sh), `src/scripts` (3) and
+        `src/installer` (5)
+  - [x] `setup.sh` is now in source form, with `# bundle:heredoc` tags and a source-only `SRC=` line + guard
+- [x] `tools/bundle.py` builds `dist/setup.sh` (`--check` fails when it is stale). It refuses untagged `$SRC`
+      references, content that contains its own delimiter, and files without a final newline.
+- [x] **Byte identity** (`make check-identical` = `tools/check_identical.py --strict`):
+  - [x] A: 39/39 `src/` files identical to their heredoc bodies in 2.0.3
+  - [x] B: `dist/setup.sh` == 2.0.3 byte for byte (sha256 `75431821…`)
+  - [x] C: `--code-only` into the same WS: 34 files identical across 2.0.3, the source form and dist
+        (content + executable bit)
+  - [x] Negative test: adding one newline to `src/app/textnorm.py` makes A, C and `bundle --check` fail
+- [x] pytest (`make test`, 18 tests, 42 s):
+  - the 8 `testplans unit` checks, run in a temporary `PIPE_WS` against `src/app`
+  - bundle consistency and failure modes; `bash -n`
+  - Result: 8/8 PASS with bpy 5.2.2 (Blender check "scene + export + 20 validation checks passed"),
+    7 PASS + 1 SKIP without Blender, the same as before the split.
+- [x] `requirements-dev.lock` (Python 3.12: the CPU part of the pipeline at the exact versions of
+      `requirements.lock`, plus pytest 9.1.1 and ruff 0.16.9) and `requirements-bpy.lock` (bpy 5.2.2, Python 3.13)
+- [x] ruff 0.16.9, lint only:
+  - explicit rules E4/E7/E9/F/B (ruff 0.16's built-in default enables about 413 rules)
+  - `tools/` and `tests/` are clean
+  - the 2.0.3 code has a per-file baseline of 99 findings, for Phase 2:
+    - 26 E401 multiple imports on one line
+    - 16 F401 unused import
+    - 13 B905 `zip()` without `strict`
+    - 12 E731 lambda assignment
+    - 11 B007 unused loop variable
+    - 10 E741 ambiguous name
+    - 7 B023 closure over a loop variable (plan.py; to review)
+    - 2 F841 unused variable
+    - 1 B008 function call in a default argument
+    - 1 B904 `raise` without `from` inside `except`
+- [x] shellcheck 0.11.0 (`make shellcheck`): 0 findings on the source-form and dist installers, the GEN3D build
+      script, and the generated env/run/start/agent scripts (+ `bash -n`)
+- [x] Makefile (dev, dev-bpy, bundle, check-bundle, check-identical, test, ruff, shellcheck, lint, check),
+      `.gitignore`, `docs/DEVELOPMENT.md`; POD_TEST_PLAN now says to upload `dist/setup.sh`; CHANGELOG
+      "Unreleased" entry
+- [ ] Optional Dockerfile - **not added**. There is no Docker daemon here, so it could not be built or tested,
+      and its base image could not be pinned to a verified digest.
+
+Not verified: nothing new needs the GPU. The pod file is byte-identical to 2.0.3, so the 2.0.3 pod results
+still apply, and your 2.0.3 rerun is still pending.
 
 ## Phase 2 - verified bugs + robustness
 
