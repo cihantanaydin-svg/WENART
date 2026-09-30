@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # setup.sh - floor plan -> furnished 3D apartment (Blender) + photoreal renders (PoC on ONE Runpod GPU pod)
-SETUP_VERSION="2.0.1"   # see CHANGELOG.md
+SETUP_VERSION="2.0.2"   # see CHANGELOG.md
 #
 # What it does : checks GPU/driver/disk, installs pinned tools into /workspace (uv, Python venv,
 #                PyTorch, Blender 5.2.2, LibreDWG), downloads the AI models and CC0 assets, writes the
@@ -431,16 +431,31 @@ def detect(path):
     raise ValueError("Unsupported input (use PDF, DWG, DXF, JPG or PNG). HEIC: export as JPG first.")
 
 
+def dxf_entities(p):
+    """Number of model-space entities (0 if unreadable) - a converted DXF can be large but empty."""
+    try:
+        from ezdxf import recover
+        return len(recover.readfile(str(p))[0].modelspace())
+    except Exception:
+        return 0
+
+
 def dwg_to_dxf(dwg, out_dir):
-    """LibreDWG first; ODA File Converter (if you installed it) as fallback."""
+    """LibreDWG first; ODA File Converter (if you installed it) as fallback.
+    LibreDWG 0.14 writes an EMPTY model space when asked for DXF r2004 or newer (checked with r2004-r2018),
+    so it writes r2000 (non-ASCII text arrives as \\U+XXXX, which textnorm.repair decodes)."""
     out = Path(out_dir) / (Path(dwg).stem + ".dxf")
     tool = WS / "opt/libredwg/bin/dwg2dxf"
-    try:
-        run([tool, "-y", "--as", "r2018", "-o", out, dwg])
-    except Exception as e:
-        log(f"LibreDWG failed: {e}")
-    if out.exists() and out.stat().st_size > 2000:
-        return out, "libredwg"
+    for ver in ("r2000", None):
+        try:
+            run([tool, "-y"] + (["--as", ver] if ver else []) + ["-o", out, dwg])
+        except Exception as e:
+            log(f"LibreDWG failed ({ver or 'default version'}): {e}")
+        n = dxf_entities(out) if out.exists() else 0
+        if n:
+            log(f"LibreDWG: {n} entities in {out.name}")
+            return out, "libredwg"
+        log(f"LibreDWG ({ver or 'default version'}) wrote no drawing entities")
     oda = Path(os.environ.get("PIPE_ODA", WS / "opt/oda/ODAFileConverter"))
     if oda.exists():
         src = Path(out_dir) / "oda_in"
@@ -454,6 +469,17 @@ def dwg_to_dxf(dwg, out_dir):
 
 
 # ---------- helpers ----------
+def utf8_mojibake(s):
+    """UTF-8 text decoded as Windows-1252 (LibreDWG 0.14 writes UTF-8 into r2000 DXF marked ANSI_1252):
+    'Ã‡OCUK' -> 'ÇOCUK'. Only applied when the text re-decodes cleanly."""
+    if any(c in s for c in "ÂÃÄÅ"):
+        try:
+            return s.encode("cp1252").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return s
+    return s
+
+
 def fill_polys(img, polys, value=255):
     pts = [np.round(np.asarray(p, dtype=np.float64) * 16).astype(np.int32) for p in polys if len(p) >= 3]
     if pts:
@@ -544,7 +570,7 @@ def parse_dxf(path, out):
             txt = ent.plain_text() if t == "MTEXT" else ent.dxf.text
             p = ent.dxf.insert
             hgt = ent.dxf.get("char_height", None) if t == "MTEXT" else ent.dxf.get("height", 0.2)
-            for i, line in enumerate(repair(txt).splitlines()):
+            for i, line in enumerate(repair(utf8_mojibake(txt)).splitlines()):
                 if line.strip():
                     items.append(("text", lk, (line.strip(), p.x, p.y - i * (hgt or 0.2) * 1.4, hgt or 0.2)))
             return
@@ -2729,10 +2755,10 @@ def import_asset(it, a, limits):
     dims = hi - lo
     if min(dims) <= 1e-4:
         return _reject(me, f"flat or empty model {tuple(round(x, 3) for x in dims)}")
-    if a.get("fit") == "height":
-        s = h / dims.z
-        if dims.x * s > w * 1.8 or dims.y * s > d * 1.8:
-            return _reject(me, "footprint too big for the slot")
+    if a.get("fit") == "height":   # same rule as furniture.fit(): slot height, smaller if too wide
+        s = min(h / dims.z, 1.8 * w / dims.x, 1.8 * d / dims.y)
+        if dims.z * s < 0.5 * h or not 0.2 <= s <= 3.0:
+            return _reject(me, "too wide for the slot even at half its height")
         sc = (s, s, s)
     else:
         sc = (w / dims.x, d / dims.y, h / dims.z)
@@ -2837,7 +2863,8 @@ def build_furniture():
             rec["reason"] = info
             WARN.append(f"{it['id']}: model {a['asset_id']} rejected ({info}) - parametric used")
         if it["type"] == "plant":
-            WARN.append("plant skipped: no plant model downloaded" if not a.get("file") else f"plant {it['id']} skipped")
+            WARN.append("plant skipped: no plant model downloaded" if CHOICE is None
+                        else f"plant {it['id']} skipped: {rec['reason'] or 'no fitting model'}")
             qa.append(dict(rec, used="skipped"))
             continue
         parametric_item(it)
@@ -5535,11 +5562,11 @@ def fit(entry, item, cfg):
     """How the model fits the layout slot. {'ok', 'err', 'scale': [sx, sy, sz], 'why'}."""
     fc = cfg["furniture"]
     tgt, dims = item["size"], entry["dims_m"]
-    if entry.get("fit") == "height":
-        s = tgt[2] / max(dims[2], 1e-6)
-        ok = dims[0] * s <= tgt[0] * 1.8 and dims[1] * s <= tgt[1] * 1.8 and 0.3 <= s <= 3.0
-        return {"ok": ok, "err": round(abs(s - 1) * 0.25, 4), "scale": [round(s, 4)] * 3,
-                "why": "" if ok else "footprint too big for the slot at this height"}
+    if entry.get("fit") == "height":   # uniform: slot height, smaller if the footprint would exceed 1.8 x the slot
+        s = min(tgt[2] / max(dims[2], 1e-6), 1.8 * tgt[0] / max(dims[0], 1e-6), 1.8 * tgt[1] / max(dims[1], 1e-6))
+        ok = dims[2] * s >= 0.5 * tgt[2] and 0.2 <= s <= 3.0
+        return {"ok": ok, "err": round(abs(dims[2] * s / tgt[2] - 1) * 0.25 + abs(s - 1) * 0.05, 4),
+                "scale": [round(s, 4)] * 3, "why": "" if ok else "too wide for the slot even at half its height"}
     s = [t / max(d, 1e-6) for t, d in zip(tgt, dims)]
     su = statistics.median(s)
     r = [x / su for x in s]

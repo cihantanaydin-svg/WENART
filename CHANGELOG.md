@@ -7,6 +7,27 @@ policy). All estimates are marked **ESTIMATE**.
 
 ---
 
+## 2.0.2 - 2026-09-30 - fix: DWG input, Turkish text from DWG, plant fit
+
+From the first pod smoke test (all inputs passed except `dwg`: "pipeline crashed" after 3 s). Reproduced here with a
+LibreDWG 0.14 build made exactly like setup step 7:
+* **DWG files lost all geometry.** `parse.py` converted with `dwg2dxf --as r2018`; LibreDWG 0.14 writes an *empty*
+  model space for every DXF version from r2004 up (tested r2004, r2010, r2013, r2018: 0 of 87 entities), while r2000
+  keeps all 87. This bug was already in 1.0.0 and hits real DWG files too, not only the smoke test.
+  `dwg_to_dxf` now converts to r2000 (default version as a second try) and accepts a result only if it contains
+  drawing entities (was: file size > 2 kB), then falls back to ODA as before.
+* **Turkish text from DWG.** LibreDWG writes UTF-8 text into that r2000 DXF but marks it Windows-1252, so
+  `ÇOCUK ODASI` arrived as `Ã‡OCUK ODASI` (child-room flag lost) and `m²` as `mÂ²` (area labels lost).
+  `parse.py` repairs such text only when it re-decodes cleanly as UTF-8 (all Turkish letters and m² tested).
+* **Plants were always skipped** when the Poly Haven plant models are wider than the slot at 1.10 m. Plants and
+  floor lamps are now scaled to the slot height, or smaller when needed to keep the footprint within 1.8 x the slot,
+  as long as they keep at least half the slot height (same rule in `furniture.py` and `blender_scene.py`). The
+  "plant skipped" warning now gives the real reason.
+* Verified here: the generated test DWG converts with 87 entities, all 6 rooms within tolerance with the correct
+  labels, child/master flags and m2 labels; `testplans unit` 8/8 PASS.
+
+---
+
 ## 2.0.1 - 2026-09-30 - fix: tar on volumes without chown
 
 * Pod report: step 3 stopped with `tar: uv: Cannot change ownership to uid 1001, gid 117: Operation not permitted`.

@@ -36,7 +36,8 @@ Files `setup.sh --code-only` now writes:
 | `app/testplans.py` | `unit` mode (CPU), `final/` checks in the smoke test, one agent run |
 | `app/requirements.lock` | +5 pins (jsonschema and its dependencies), nothing else changed |
 | `app/env.sh`, `run.sh`, `start.sh` | vLLM telemetry off + cache dir; usage text; vLLM check + stale PID cleanup |
-| 12 other app files | byte-identical to the 1.0.0 output |
+| `app/parse.py` (2.0.2) | DWG conversion fixed (LibreDWG 0.14 empty r2018 output) and UTF-8 text repair for DWG input |
+| 11 other app files | byte-identical to the 1.0.0 output |
 
 ## 2. Offline test results (this machine: 4 CPUs, no GPU, Python 3.11/3.12/3.13)
 
