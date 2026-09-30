@@ -3,7 +3,7 @@
 Branch `claude/clever-euler-gcd4qr`. Baseline: `setup.sh` 2.0.3 (commit `3881587`). Plan: `docs/PLAN.md`.
 Legend: `[x]` done and verified here (CPU) · `[ ]` open · **UNVERIFIED** = needs the GPU pod.
 
-## Phase 0 - reading and planning (done, waiting for go-ahead)
+## Phase 0 - reading and planning (done; go-ahead given 2026-09-30)
 
 - [x] `nvidia-smi`: not present on this machine, so no GPU. All work is CPU-tested with
       mock/scripted/rules backends and bpy 5.2.2.
@@ -21,9 +21,10 @@ Legend: `[x]` done and verified here (CPU) · `[ ]` open · **UNVERIFIED** = nee
       (ARCHITECTURE §5).
 - [x] `docs/ARCHITECTURE.md`, `docs/PLAN.md`, `docs/PROGRESS.md` written.
 - [x] Brief/code conflicts C1–C10 and open questions Q1–Q9 listed (PLAN §0, §7).
-- [ ] Your answers to Q1–Q9 (or "ok to all").
-- [ ] Pins JSON from the pod (PLAN §8). Needed for Phase 2 item 7; everything else can go ahead
-      without it.
+- [x] Answers to Q1–Q9: "all others ok". Q5 is changed to **free open-weight models only**, with no
+      hosted provider. The deliverable is **one setup.sh** for the pod at the end (PLAN §0).
+- [ ] Pins JSON from the pod (PLAN §8). Needed for Phase 2 item 7; until it arrives the pins stay
+      empty and only warn.
 
 Not verified in Phase 0: anything on a GPU; the image token cost of Qwen3.5; whether xgrammar
 accepts our schemas (planned CPU check in Phase 3).

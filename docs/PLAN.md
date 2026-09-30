@@ -11,10 +11,23 @@ lists the checks that need the GPU pod. Those stay **UNVERIFIED** until you have
 
 ---
 
-## 0. Where the brief and the code disagree (decisions needed)
+## 0. Where the brief and the code disagree (decided 2026-09-30)
 
-Each item has my recommendation. Section 7 repeats them as questions. If you answer "ok to all", I
-will follow the recommendations.
+Your answer: *"keep the plan to free open weight models, give me a one setup.sh to try in a pod in
+the end, all others ok"*. That means:
+
+* **Models: free open-weight models only, run locally.**
+  * No hosted or paid provider, no API keys.
+  * The only non-managed backend is an OpenAI-compatible server on **loopback**, i.e. another local
+    server running an open-weight model.
+  * Remote URLs are refused.
+  * This replaces the recommendation in C6.
+* **Deliverable: one `setup.sh` for the pod at the end.**
+  * It is the generated single-file `dist/setup.sh`; you rename it to `setup.sh` on the pod.
+  * Every phase also leaves a working `dist/setup.sh`.
+* **Everything else: as recommended below.**
+  * C1–C5 and C7–C10 as written.
+  * The pins (C8) stay empty (they only warn) until the pod snippet in section 8 has been run.
 
 | # | Brief says | Code / facts | Recommendation |
 |---|---|---|---|
@@ -22,8 +35,8 @@ will follow the recommendations.
 | C2 | Phase 1: "setup.sh installs from [real files]" + "bundler regenerates a single-file `dist/setup.sh`" | Your pod workflow is "upload one `setup.sh` to /workspace and run it". The installer in source form needs the repo tree next to it. | Pod entry point = **`dist/setup.sh`** (single file, committed, workflow unchanged). The root `setup.sh` + `src/` are for development, or for a `git clone` on the pod. |
 | C3 | Phase 1: "no behaviour change" + "byte-identical check" | ruff (or any formatter) would change bytes. | Phase 1 runs ruff as **lint only**, with a recorded baseline, and never reformats. Fixes for real findings go to Phase 2. `SETUP_VERSION` stays 2.0.3 in Phase 1, so `dist/setup.sh` can equal the 2.0.3 file byte for byte. |
 | C4 | Phase 3 acceptance: "a plan edit invalidates exactly layout/scene/render/export" | The code has an `assets` stage (furniture choice, which depends on `layout.json`) between layout and scene. `polish` and `report` also sit downstream. | "Exactly" = layout, **assets**, scene, render, **polish**, export, **report**. Never parse, vlm or plan. The test asserts this exact set. |
-| C5 | Principle 4: "specialists share the served model" vs Phase 3: "each role with its own backend/model" | Only one vLLM server fits on the GPU next to Blender and SDXL (the VRAM planner assumes one). | Config allows a model per role, but every role on the **local** backend must resolve to the one served model; validation rejects anything else. Per-role differences are prompt, tool subset, temperature, thinking and max tokens. A different model per role is possible only through an explicitly enabled external endpoint (C6). |
-| C6 | "optional hosted provider (opt-in)" vs the earlier brief: "no paid keys", "never put secrets in files", "plans can be confidential" | - | A generic OpenAI-compatible client only (no vendor SDK, no new dependency). It is off by default. A non-loopback URL needs `allow_remote: true`. The key is read from an environment variable **named** in config (`api_key_env`), never stored. Every remote call is logged in `agent_log.jsonl`, and the report says so in a banner. Which provider: your choice (Q5). |
+| C5 | Principle 4: "specialists share the served model" vs Phase 3: "each role with its own backend/model" | Only one vLLM server fits on the GPU next to Blender and SDXL (the VRAM planner assumes one). | Config allows a model per role, but every role on the **local** backend must resolve to the one served model; validation rejects anything else. Per-role differences are prompt, tool subset, temperature, thinking and max tokens. A different model per role is possible only through a second **local** open-weight server on loopback (C6). |
+| C6 | "optional hosted provider (opt-in)" vs the earlier brief: "no paid keys", "never put secrets in files", "plans can be confidential" | - | **Decided: no hosted provider.** Free open-weight models only. `openai_compatible` backends are accepted only for loopback URLs (127.0.0.1 / ::1 / localhost), without API keys; any other URL is refused at config validation. |
 | C7 | Phase 2 generator: "a diagonal wall" | The plan stage handles only h/v walls (L1). Angled walls are Phase 4 work. | Phase 2 generates diagonal-wall seeds. Their tests check for **no crash + a warning**; geometry accuracy is `xfail` until Phase 4. |
 | C8 | Phase 2 item 7: "HF `revision=` from a shipped `models.lock.json`, Poly Haven slugs + `files_hash` pinned, ambientCG checksums" | From this sandbox huggingface.co, api.polyhaven.com and ambientcg.com cannot be reached, so I cannot read the revisions or checksums here. **Rule: do not invent them.** | I build the mechanism with the pins left empty; an empty pin means an "UNPINNED" warning and today's behaviour. You run the snippet in section 8 on the pod and I fill in the lock from its output. Files already in the HF cache are not downloaded again. `snapshot_download(revision=<the commit already cached>)` reuses the cached blobs. The step-8 marker files also still skip the step on re-runs. |
 | C9 | Phase 5: "evaluate Infinigen Indoors (verify licence first)" | Infinigen installs its own Blender-as-module environment and builds from source. That conflicts with "prebuilt wheels only" and the pinned Blender 5.2.2. | Evaluation only: licence, install footprint, determinism, a CPU trial in a scratch venv (not shipped). Written up in `docs/INFINIGEN.md`. It is not integrated unless you decide otherwise after reading that. |
@@ -98,9 +111,8 @@ will follow the recommendations.
 },
 "backends": {
   "local":  {"type": "vllm_managed"},                                   // today's llm.* settings
-  "endpoint": {"type": "openai_compatible", "base_url": "http://127.0.0.1:8012/v1", "enabled": false},
-  "hosted": {"type": "openai_compatible", "base_url": "https://…", "api_key_env": "MY_PROVIDER_KEY",
-             "enabled": false, "allow_remote": false}
+  "endpoint": {"type": "openai_compatible", "base_url": "http://127.0.0.1:8012/v1", "enabled": false}
+                                              // loopback only: another local open-weight model server
 },
 "agent": {"policy": {"reader": "llm", "designer": "llm", "director": "llm"}, ...today's budgets...}
 ```
@@ -311,9 +323,8 @@ Work:
   Phase 7.
 * LLM layer (`app/llm/`):
   * `Backend` classes: `vllm_managed`, `openai_compatible`, `scripted`
-  * roles config and validation (C5, C6)
+  * roles config and validation (C5, C6: local roles share the served model, endpoints loopback-only)
   * structured proposals (named `tool_choice` / `response_format`), bounded retries
-  * a remote-use log and report banner
 * Orchestrator on a compact state summary; specialists get a stub interface. Their real prompts and
   tools come in Phases 4–6; until then the orchestrator drives today's 12 tools with the same
   behaviour.
@@ -330,7 +341,7 @@ Acceptance:
 4. Stub-server tests (HTTP OpenAI stub, as in 2.0.0) cover:
    * named `tool_choice` / `response_format` are sent
    * invalid JSON N times leads to a rejection after `max_retries`, with no state change
-   * a remote URL without `allow_remote` is refused
+   * a non-loopback endpoint URL is refused
    * a local role with a second model is refused
 5. The state summary is at most 4 800 characters on the smoke plan.
 
@@ -557,7 +568,7 @@ Acceptance: the Definition of done in the brief.
 | R7 | Phase 1 byte identity blocks cleanup | cleanup deliberately moved to Phase 2 |
 | R8 | Pins need network access this sandbox lacks | pod snippet (section 8); empty pins = today's behaviour + warning |
 | R9 | Licence creep (styles, materials, polish models, Infinigen) | every new asset or model pinned + LICENSES.txt + your approval; permissive licences only |
-| R10 | Plan confidentiality with remote backends | off by default, loopback check, `allow_remote`, key from env only, logged + banner |
+| R10 | Plan confidentiality | no remote backends at all (decision C6); config validation refuses non-loopback URLs |
 | R11 | Scope: 8 phases | strict gating; each phase ships a working `dist/setup.sh` |
 
 ## 5. What stays exactly as it is
@@ -575,7 +586,7 @@ Acceptance: the Definition of done in the brief.
 * Your full setup rerun on 2.0.3: `agent (llm)` smoke line and the second vLLM start-up time. This
   does not block Phase 1.
 
-## 7. Open questions (recommendation first)
+## 7. Open questions - answered 2026-09-30 ("all others ok"; Q5 → free open-weight models only)
 
 1. **Pod entry point (C2):** keep uploading a single file (`dist/setup.sh`), or git-clone the repo on
    the pod? → *single file*
@@ -585,8 +596,7 @@ Acceptance: the Definition of done in the brief.
    you mean? → *yes*
 4. **Per-role models (C5):** do local roles share the one served model, with other models only
    through an explicitly enabled endpoint? → *yes*
-5. **Hosted provider (C6):** do you want one at all, and which? The plan is a generic
-   OpenAI-compatible client, off by default. → *none enabled; generic client only*
+5. **Hosted provider (C6):** → **none; free open-weight models only** (your answer)
 6. **Diagonal walls in Phase 2 (C7):** no crash + warning until Phase 4? → *yes*
 7. **Infinigen (C9):** evaluation write-up only? → *yes*
 8. **ruff (C3):** lint with a baseline in Phase 1, fixes in Phase 2? → *yes*
