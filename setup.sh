@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # setup.sh - floor plan -> furnished 3D apartment (Blender) + photoreal renders (PoC on ONE Runpod GPU pod)
-SETUP_VERSION="2.0.2"   # see CHANGELOG.md
+SETUP_VERSION="2.0.3"   # see CHANGELOG.md
 #
 # What it does : checks GPU/driver/disk, installs pinned tools into /workspace (uv, Python venv,
 #                PyTorch, Blender 5.2.2, LibreDWG), downloads the AI models and CC0 assets, writes the
@@ -3971,6 +3971,8 @@ def _unit_server():
     for flag in ("serve", "--enable-auto-tool-choice", "--tool-call-parser qwen3_coder", "--reasoning-parser qwen3",
                  "--default-chat-template-kwargs", "--max-model-len", "--gpu-memory-utilization", "--limit-mm-per-prompt"):
         assert flag in cmd, flag
+    env = s.server_env()
+    assert env["VLLM_USE_FLASHINFER_SAMPLER"] == "0" and env["PATH"].split(":")[0].endswith("venv-llm/bin"), env["PATH"][:80]
     assert memory_utilization(cfg, "Qwen/Qwen3.5-9B", 46068) == 0.57, memory_utilization(cfg, "Qwen/Qwen3.5-9B", 46068)
     assert memory_utilization(cfg, "Qwen/Qwen3.5-4B", 24564) == 0.65
     assert memory_utilization(cfg, "Qwen/Qwen3.6-27B-FP8", 46068) == 0.8
@@ -5778,6 +5780,19 @@ class LLMServer:
     def budget_mb(self):
         return int(self.util * self.total_mb) if self.total_mb else None
 
+    def server_env(self):
+        """Environment of the vLLM process. The vLLM venv's bin/ goes first on PATH (its ninja and nvcc for any
+        just-in-time kernel build), and FlashInfer's top-k/top-p sampler is off: it compiles a CUDA kernel at the
+        first warm-up, which failed on the pod (no ninja on PATH, no CUDA compiler in the image). vLLM then uses its
+        PyTorch sampler - the agent samples at temperature 0-0.2, so nothing is lost."""
+        venv_bin = str(Path(self.cfg["llm"]["venv"]) / "bin")
+        env = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", VLLM_CACHE_ROOT=str(WS / "cache/vllm"),
+                   VLLM_NO_USAGE_STATS="1", DO_NOT_TRACK="1", VLLM_USE_FLASHINFER_SAMPLER="0",
+                   FLASHINFER_WORKSPACE_BASE=str(WS / "cache"),
+                   PATH=venv_bin + os.pathsep + os.environ.get("PATH", ""))
+        env.pop("VIRTUAL_ENV", None)
+        return env
+
     def command(self):
         lc = self.cfg["llm"]
         exe = Path(lc["venv"]) / "bin/vllm"
@@ -5812,8 +5827,7 @@ class LLMServer:
         if not exe.exists():
             raise RuntimeError(f"{exe} not found - run setup.sh without SKIP_AGENT_LLM=1, or use --backend rules")
         self._kill_stale()
-        env = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", VLLM_CACHE_ROOT=str(WS / "cache/vllm"),
-                   VLLM_NO_USAGE_STATS="1", DO_NOT_TRACK="1")
+        env = self.server_env()
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         fh = open(self.log_file, "a", encoding="utf-8")
         fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(self.command())}\n")

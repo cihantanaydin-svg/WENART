@@ -7,6 +7,19 @@ policy). All estimates are marked **ESTIMATE**.
 
 ---
 
+## 2.0.3 - 2026-09-30 - fix: vLLM start-up (FlashInfer just-in-time build)
+
+* Pod report (L40S): the agent LLM check failed, setup fell back to the rules backend. `logs/llm_server.log`:
+  vLLM's warm-up sampled with FlashInfer's top-k/top-p kernel, which FlashInfer compiles on first use, and the
+  build failed with `FileNotFoundError: 'ninja'`.
+* `llm_server.py` now starts vLLM with `VLLM_USE_FLASHINFER_SAMPLER=0` (vLLM 0.30.0 then uses its PyTorch
+  top-k/top-p sampler; verified in `vllm/v1/sample/ops/topk_topp_sampler.py`), with the vLLM venv's `bin/` first on
+  PATH (the lock already installs `ninja` and `nvcc` there, for any other just-in-time build), and with
+  `FLASHINFER_WORKSPACE_BASE=/workspace/cache` (its default is the home folder on the container disk).
+* UNVERIFIED until the pod rerun: that no other start-up step needs a compiler.
+
+---
+
 ## 2.0.2 - 2026-09-30 - fix: DWG input, Turkish text from DWG, plant fit
 
 From the first pod smoke test (all inputs passed except `dwg`: "pipeline crashed" after 3 s). Reproduced here with a
