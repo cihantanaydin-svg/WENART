@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # setup.sh - floor plan -> furnished 3D apartment (Blender) + photoreal renders (PoC on ONE Runpod GPU pod)
-SETUP_VERSION="2.0.0"   # see CHANGELOG.md
+SETUP_VERSION="2.0.1"   # see CHANGELOG.md
 #
 # What it does : checks GPU/driver/disk, installs pinned tools into /workspace (uv, Python venv,
 #                PyTorch, Blender 5.2.2, LibreDWG), downloads the AI models and CC0 assets, writes the
@@ -8029,7 +8029,7 @@ step "3/13 uv $UV_VERSION, Python $PY_VERSION, venv $WS/venv (~1 min)"
 if [[ ! -x "$UV" ]]; then
   mkdir -p "$(dirname "$UV")"
   curl -fsSL --retry 3 "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-x86_64-unknown-linux-gnu.tar.gz" \
-    | tar -xz -C "$(dirname "$UV")" --strip-components=1
+    | tar -xz --no-same-owner -C "$(dirname "$UV")" --strip-components=1
 fi
 "$UV" --version
 "$UV" python install "$PY_VERSION"
@@ -8064,7 +8064,7 @@ if [[ ! -x "$BL_DIR/blender" ]]; then
   curl -fsSL --retry 3 -o "$T/sums.txt" "https://download.blender.org/release/Blender$BLENDER_SERIES/blender-$BLENDER_VERSION.sha256"
   (cd "$T" && grep "$F\$" sums.txt | sha256sum -c -)
   mkdir -p "$BL_DIR"
-  tar -xJf "$T/$F" -C "$BL_DIR" --strip-components=1
+  tar -xJf "$T/$F" --no-same-owner -C "$BL_DIR" --strip-components=1
   rm -rf "$T"
 fi
 "$BL_DIR/blender" -b --factory-startup --python-expr "import bpy; print('BLENDER_OK', bpy.app.version_string)" 2>&1 | grep BLENDER_OK \
@@ -8075,7 +8075,7 @@ step "7/13 LibreDWG $LIBREDWG_VERSION for DWG files (~4-8 min the first time)"
 if [[ ! -x "$LDWG/bin/dwg2dxf" ]]; then
   T=$(mktemp -d)
   if curl -fL --retry 3 -o "$T/l.tar.xz" "https://github.com/LibreDWG/libredwg/releases/download/$LIBREDWG_VERSION/libredwg-$LIBREDWG_VERSION.tar.xz" \
-     && tar -xJf "$T/l.tar.xz" -C "$T" \
+     && tar -xJf "$T/l.tar.xz" --no-same-owner -C "$T" \
      && (cd "$T/libredwg-$LIBREDWG_VERSION" && ./configure --prefix="$LDWG" --disable-bindings > "$WS/logs/libredwg_build.log" 2>&1 \
          && make -j"$(nproc)" >> "$WS/logs/libredwg_build.log" 2>&1 && make install >> "$WS/logs/libredwg_build.log" 2>&1); then
     echo "LibreDWG installed to $LDWG"

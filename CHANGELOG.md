@@ -7,6 +7,14 @@ policy). All estimates are marked **ESTIMATE**.
 
 ---
 
+## 2.0.1 - 2026-09-30 - fix: tar on volumes without chown
+
+* Pod report: step 3 stopped with `tar: uv: Cannot change ownership to uid 1001, gid 117: Operation not permitted`.
+  The /workspace volume does not allow chown, and tar running as root tries to keep the archive's file owner.
+* All three extractions into /workspace (uv, Blender, LibreDWG) now use `tar --no-same-owner`. Nothing else changed.
+
+---
+
 ## 2.0.0 - 2026-09-30 - agent layer, furniture library, Blender deliverable
 
 ### What changed at a glance
