@@ -57,6 +57,9 @@ FLEXGEMM_COMMIT="6dd94a859c26ee8246888502eada3dd8ad85532e"   # GEN3D only: Jeffr
 UTILS3D_COMMIT="9a4eb15e4021b67b12c460c7057d642626897ec8"    # GEN3D only, as pinned by TRELLIS.2's setup.sh
 FLASH_ATTN_VERSION="2.7.3"                                   # GEN3D only, as pinned by TRELLIS.2's setup.sh
 
+# source form: the embedded files live in src/ next to this script; tools/bundle.py builds the single-file dist/setup.sh  # bundle:source-only
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/src"  # bundle:source-only
+[[ -f "$SRC/app/common.py" ]] || { echo "src/ not found next to $0 - on a pod use the single-file dist/setup.sh"; exit 1; }  # bundle:source-only
 # ---------- logging, error trap, folders ----------
 mkdir -p "$WS/logs"
 LOG="$WS/logs/setup_$(date +%Y%m%d_%H%M%S).log"
@@ -77,9 +80,6 @@ export HF_HOME="$WS/hf" PIP_CACHE_DIR="$WS/cache/pip" XDG_CACHE_HOME="$WS/cache"
 export PIPE_WS="$WS" PIPE_BLENDER="$BL_DIR/blender" PYTHONPATH="$WS"
 APT_PKGS="tmux nano curl ca-certificates xz-utils build-essential pkg-config xvfb libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6 libgl1 libegl1 libglu1-mesa"
 step() { echo; echo "=== [$(date +%H:%M:%S)] $* ==="; }
-# source form: the embedded files live in src/ next to this script; tools/bundle.py builds the single-file dist/setup.sh  # bundle:source-only
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/src"  # bundle:source-only
-[[ -f "$SRC/app/common.py" ]] || { echo "src/ not found next to $0 - on a pod use the single-file dist/setup.sh"; exit 1; }  # bundle:source-only
 
 # ---------- the pipeline code (one Python module per stage) + helper scripts ----------
 write_code() {

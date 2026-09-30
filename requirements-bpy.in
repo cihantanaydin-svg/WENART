@@ -1,0 +1,4 @@
+# Development only (make dev-bpy): Blender 5.2.2 as a Python module (Python 3.13) to run the Blender
+# scripts on the CPU in tests - same Blender version as the pinned binary the pod uses.
+# Regenerate: uv pip compile requirements-bpy.in --python-version 3.13 --only-binary :all: -o requirements-bpy.lock
+bpy==5.2.2

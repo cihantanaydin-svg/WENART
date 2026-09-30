@@ -1,0 +1,17 @@
+# Development only (make dev) - never installed on the pod. The pipeline packages are constrained to the
+# exact versions of src/app/requirements.lock (CPU subset: what `app.testplans unit` needs without a GPU).
+# Regenerate: uv pip compile requirements-dev.in -c src/app/requirements.lock --python-version 3.12 --only-binary :all: -o requirements-dev.lock
+numpy
+opencv-python-headless
+scipy
+shapely
+scikit-image
+ezdxf
+pdfplumber
+reportlab
+pypdfium2
+matplotlib
+pillow
+jsonschema
+pytest==9.1.1
+ruff==0.16.9

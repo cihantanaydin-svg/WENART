@@ -3,8 +3,8 @@
 
 Every quoted heredoc line   <prefix><<'DELIM'   (body until a line equal to DELIM)
 becomes                     <prefix>< "$SRC/<path>"  # bundle:heredoc DELIM
-and its body is written to src/<path> byte for byte. A source-only SRC= line (+ guard) is inserted after
-the step() helper. The result is verified: tools/bundle.py must rebuild the input byte for byte.
+and its body is written to src/<path> byte for byte. A source-only SRC= line (+ guard) is inserted before
+the logging section (before anything is written to WS). The result is verified: tools/bundle.py must rebuild the input byte for byte.
 
     python3 tools/extract.py <single-file setup.sh>      (writes setup.sh and src/ in the repo root)
 """
@@ -23,6 +23,11 @@ STDIN_SCRIPTS = {                       # heredocs fed to "$PY -" on stdin (no t
     "__END_OF_AGENT_DL__": "installer/dl_agent_model.py",
     "__END_OF_GEN3D_DL__": "installer/dl_gen3d.py",
 }
+HEADER_NOTE = (
+    "# SOURCE FORM (development): needs src/ next to it. The file for the pod is the single-file dist/setup.sh,"
+    "  # bundle:source-only\n"
+    "# built by: python3 tools/bundle.py  (see docs/DEVELOPMENT.md)  # bundle:source-only\n"
+)
 SRC_LINES = (
     '# source form: the embedded files live in src/ next to this script; '
     'tools/bundle.py builds the single-file dist/setup.sh  # bundle:source-only\n'
@@ -56,10 +61,12 @@ def split(text):
     while i < len(lines):
         line = lines[i]
         m = HEREDOC.match(line.rstrip("\n"))
+        if line.startswith("# ---------- logging, error trap, folders"):
+            out.append(SRC_LINES)
         if not m:
             out.append(line)
-            if line.startswith("step() {"):
-                out.append(SRC_LINES)
+            if line.startswith("SETUP_VERSION="):
+                out.append(HEADER_NOTE)
             i += 1
             continue
         delim = m["delim"]
@@ -74,7 +81,7 @@ def split(text):
         out.append(f'{m["prefix"]}< "$SRC/{rel}"  # bundle:heredoc {delim}\n')
         i = j + 1
     if SRC_LINES not in out:
-        raise ValueError("step() helper not found - nowhere to put the SRC= line")
+        raise ValueError("logging section not found - nowhere to put the SRC= line")
     return "".join(out), files, order
 
 

@@ -1,0 +1,40 @@
+# Lint only. Nothing is ever reformatted automatically: src/ is embedded byte for byte in dist/setup.sh.
+target-version = "py312"
+line-length = 120
+extend-exclude = [".venv-dev", ".venv-bpy"]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "B"]
+
+[lint.per-file-ignores]
+# Baseline: findings in the 2.0.3 code, which Phase 1 must not change (byte identity). Fixed in Phase 2;
+# the list shrinks as files are cleaned. New code (tools/, tests/, new modules) gets no exceptions.
+"src/app/agent.py" = ["E401", "E741", "F401"]
+"src/app/assets_fetch.py" = ["B007", "E401"]
+"src/app/blender_export.py" = ["E401"]
+"src/app/blender_render.py" = ["E401", "F401"]
+"src/app/blender_scene.py" = ["B007", "B008", "B905", "E401"]
+"src/app/common.py" = ["E401"]
+"src/app/device_check.py" = ["E401"]
+"src/app/evaluate.py" = ["E401"]
+"src/app/furniture.py" = ["B905", "E401", "E731", "E741", "F401"]
+"src/app/gen3d.py" = ["E401", "F401"]
+"src/app/gen3d_worker.py" = ["E401"]
+"src/app/layout.py" = ["B007", "E731", "F841"]
+"src/app/llm_server.py" = ["B904", "E401", "F401"]
+"src/app/main.py" = ["E401", "F401"]
+"src/app/parse.py" = ["B905", "E401", "E731", "F401", "F841"]
+"src/app/patches.py" = ["B007", "B905", "E401", "E731"]
+"src/app/plan.py" = ["B007", "B023", "B905", "E731", "E741", "F401"]
+"src/app/polish.py" = ["E401"]
+"src/app/report.py" = ["F401"]
+"src/app/testplans.py" = ["B007", "E401", "E731", "E741", "F401"]
+"src/app/textnorm.py" = ["E401"]
+"src/app/validate_export.py" = ["B007", "B905", "E401"]
+"src/app/vision.py" = ["E401", "F401"]
+"src/app/vlm.py" = ["E401", "F401"]
+"src/app/wallseg.py" = ["B905", "E401", "E731"]
+"src/installer/dl_agent_model.py" = ["E401"]
+"src/installer/dl_gen3d.py" = ["E401"]
+"src/installer/dl_models.py" = ["E401"]
+"src/installer/write_config.py" = ["E401"]
